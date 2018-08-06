@@ -15,8 +15,33 @@ starterbot_id = None
 
 # constants
 RTM_READ_DELAY = 1 # 1 second delay between reading from RTM
-EXAMPLE_COMMAND = "do"
+EXAMPLE_COMMAND = "go"
 MENTION_REGEX = "^<@(|[WU].+?)>(.*)"
+
+topTrending = []
+
+def TrendingTweets(channel= 'assignment1'):
+    auth = tweepy.OAuthHandler(consumerKey, consumerSecret)
+    auth.set_access_token(accessToken, accessTokenSecret)
+    twitter = tweepy.API(auth)
+    trending = json.loads(json.dumps(twitter.trends_place(1187115), indent=4))
+
+    count = 0
+    for trending in trending[0]['trends']:
+        if count <= 10:
+            topTrending.append(trending["name"])
+            count += 1
+        else:
+            break
+
+    response = '\n'.join(topTrending)
+
+    slack_client.api_call(
+        "chat.postMessage",
+        channel=channel,
+        text=response
+    )
+
 
 def parse_bot_commands(slack_events):
     """
@@ -51,7 +76,7 @@ def handle_command(command, channel):
     response = None
     # This is where you start to implement more commands!
     if command.startswith(EXAMPLE_COMMAND):
-        response = "Sure...write some more code then I can do that!"
+        TrendingTweets(channel)
 
     # Sends the response back to the channel
     slack_client.api_call(
@@ -65,7 +90,10 @@ if __name__ == "__main__":
         print("Starter Bot connected and running!")
         # Read bot's user ID by calling Web API method `auth.test`
         starterbot_id = slack_client.api_call("auth.test")["user_id"]
+        schedule.every().day.at('6:00').do(TrendingTweets)
         while True:
+            schedule.run_pending()
+            time.sleep(RTM_READ_DELAY)
             command, channel = parse_bot_commands(slack_client.rtm_read())
             if command:
                 handle_command(command, channel)
